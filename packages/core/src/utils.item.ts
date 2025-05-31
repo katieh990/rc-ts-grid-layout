@@ -55,7 +55,10 @@ export const createStyle = (
 		usePercentages,
 		containerWidth,
 		useCSSTransforms,
-	}: Pick<ItemProps, 'usePercentages' | 'containerWidth' | 'useCSSTransforms'>,
+		autoHeight,
+	}: Pick<ItemProps, 'usePercentages' | 'containerWidth' | 'useCSSTransforms'> & {
+		autoHeight?: boolean;
+	},
 ): { [key: string]: string | null | undefined } => {
 	let style;
 	if (useCSSTransforms) {
@@ -67,5 +70,11 @@ export const createStyle = (
 			style.width = perc(position.width / containerWidth);
 		}
 	}
+
+	if (autoHeight) {
+		style.height = 'auto';
+		style.minHeight = `${position.height}px`;
+	}
+
 	return style;
 };

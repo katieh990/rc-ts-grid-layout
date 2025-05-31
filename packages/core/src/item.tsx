@@ -65,6 +65,7 @@ const GridItem = (props: ItemProps) => {
 		isBounded,
 		children,
 		wrapperProps,
+		autoHeight,
 	} = props;
 
 	const ref = useRef<HTMLDivElement>(null);
@@ -91,11 +92,13 @@ const GridItem = (props: ItemProps) => {
 				typeof dragging === 'undefined' ? '' : 'react-draggable-dragging',
 				typeof droppingPosition === 'undefined' ? '' : 'dropping',
 				typeof resizing === 'undefined' ? '' : 'resizing',
+				autoHeight ? 'auto-height' : '',
 			]
 				.filter((i) => !!i)
 				.join(' ')
 				.trim(),
 		[
+			autoHeight,
 			className,
 			dragging,
 			resizing,
@@ -105,6 +108,7 @@ const GridItem = (props: ItemProps) => {
 			useCSSTransforms,
 		],
 	);
+
 	const positionParams = useMemo(() => {
 		return {
 			cols,
@@ -153,7 +157,6 @@ const GridItem = (props: ItemProps) => {
 						offsetParent.scrollLeft,
 				};
 				setDragging(position);
-				// Call callback with this data
 				const { x, y } = calcXY(
 					innerProps.current.positionParams,
 					position.top,
@@ -264,6 +267,7 @@ const GridItem = (props: ItemProps) => {
 		},
 		[genResizeParams, i, onResize],
 	);
+
 	const onGridResizeStart: GridInnerResizeHandler = useCallback(
 		(e, data) => {
 			const position = currentPosition.current;
@@ -279,6 +283,7 @@ const GridItem = (props: ItemProps) => {
 		},
 		[genResizeParams, i, onResizeStart],
 	);
+
 	const onGridResizeStop: GridInnerResizeHandler = useCallback(
 		(e, data) => {
 			const position = currentPosition.current;
@@ -294,11 +299,12 @@ const GridItem = (props: ItemProps) => {
 		},
 		[genResizeParams, i, onResizeStop],
 	);
+
 	const maxPosition = useMemo(
 		() => calcGridItemPosition(positionParams, 0, 0, cols, 0),
 		[cols, positionParams],
 	);
-	// Calculate min/max constraints using our min & maxes
+
 	const mins = useMemo(
 		() => calcGridItemPosition(positionParams, 0, 0, minW, minH),
 		[minH, minW, positionParams],
@@ -313,6 +319,7 @@ const GridItem = (props: ItemProps) => {
 		() => [mins.width, mins.height],
 		[mins.height, mins.width],
 	);
+
 	const maxConstraints: [number, number] = useMemo(
 		() => [Math.min(maxes.width, maxPosition.width), Math.min(maxes.height, Infinity)],
 		[maxPosition.width, maxes.height, maxes.width],
@@ -389,6 +396,7 @@ const GridItem = (props: ItemProps) => {
 								containerWidth,
 								usePercentages,
 								useCSSTransforms,
+								autoHeight,
 							}),
 						},
 					})
@@ -403,6 +411,7 @@ const GridItem = (props: ItemProps) => {
 								containerWidth,
 								usePercentages,
 								useCSSTransforms,
+								autoHeight,
 							}),
 						}}>
 						{children}
