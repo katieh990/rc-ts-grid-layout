@@ -51,16 +51,6 @@ const defaultDroppingItem = {
 	w: 1,
 };
 
-// case 1
-// wrapper -> layout -> gird-layout
-// calc next-layout
-// if next-layout !== layout
-// callback onLayoutChange to update wrapper layout
-
-// case 2
-// update wrapper layout
-// grid-layout update inner-layout
-
 const GridLayout: FC<RGLProps> = memo(
 	({
 		innerRef,
@@ -71,7 +61,7 @@ const GridLayout: FC<RGLProps> = memo(
 		draggableHandle = '',
 		draggableCancel = '',
 		rowHeight = 150,
-		maxRows = Infinity, // infinite vertical growth
+		maxRows = Infinity,
 		layout = defaultLayout,
 		margin = defaultMargin,
 		isBounded = false,
@@ -110,16 +100,12 @@ const GridLayout: FC<RGLProps> = memo(
 		}, []);
 
 		const lastLayout = useRef<Layout>(layout);
-		/**
-		 * previous item layout
-		 */
 		const old = useRef<LayoutItem>();
 		const droppingDOM = useRef<ReactElement>();
 		const lastRect = useRef<Rect>();
 		const resizing = useRef(false);
 		const dragEnterCount = useRef(0);
-		// finally compact type
-		// Legacy support for verticalCompact: false
+
 		const innerCompactType = useMemo(
 			() =>
 				genCompactType({
@@ -166,9 +152,21 @@ const GridLayout: FC<RGLProps> = memo(
 				: margin[1];
 			return nbRow * rowHeight + (nbRow - 1) * margin[1] + containerPaddingY * 2 + 'px';
 		}, [autoSize, containerPadding, innerLayout, margin, rowHeight]);
-		// gen a placeholder when resizing or moving
+
+		const handleItemHeightChange = useCallback((itemId: string, newHeight: number) => {
+			setInnerLayout((prevLayout) => {
+				const updatedLayout = prevLayout.map((item) => {
+					if (item.i === itemId) {
+						return { ...item, h: newHeight };
+					}
+					return item;
+				});
+				
+				return compact(updatedLayout, innerCompactType, cols, allowOverlap);
+			});
+		}, [cols, innerCompactType, allowOverlap]);
+
 		const placeholder = useMemo(() => {
-			// console.log('placeholder rect', rect);
 			if (rect) {
 				const { w, h, x, y, i } = rect;
 				const cls = `react-grid-placeholder ${
@@ -218,14 +216,12 @@ const GridLayout: FC<RGLProps> = memo(
 		const onLayoutMaybeChanged = useCallback(
 			(nextLayout: Layout, prevLayout: Layout) => {
 				if (!deepEqual(prevLayout, nextLayout)) {
-					// inner 与 outer 的layout 不同时, 应回调父级 onLayoutChange
 					onLayoutChange(nextLayout);
 				}
 			},
 			[onLayoutChange],
 		);
-		// when layout or children update
-		// remove placeholder
+
 		const removeDroppingPlaceholder = useCallback(() => {
 			const nextLayout = compact(
 				innerLayout.filter((l) => l.i !== droppingItem.i),
@@ -242,16 +238,14 @@ const GridLayout: FC<RGLProps> = memo(
 		}, [allowOverlap, cols, droppingItem.i, innerCompactType, innerLayout]);
 
 		const preventBrowserNativeAction = useCallback((e: DragNativeEvent) => {
-			// Prevent any browser native action
 			e.preventDefault();
 			e.stopPropagation();
 		}, []);
-		// onDrop
+
 		const onInnerDrop: DragHandler = useCallback(
 			(e) => {
 				preventBrowserNativeAction(e);
 				const item = innerLayout.find((l) => l.i === droppingItem.i);
-				// reset dragEnter counter on drop
 				dragEnterCount.current = 0;
 				removeDroppingPlaceholder();
 				if (typeof onDrop === 'function') {
@@ -268,23 +262,18 @@ const GridLayout: FC<RGLProps> = memo(
 				removeDroppingPlaceholder,
 			],
 		);
-		// onDragLeave
+
 		const onInnerDragLeave: DragHandler = useCallback(
 			(e) => {
 				preventBrowserNativeAction(e);
 				dragEnterCount.current--;
-				// onDragLeave can be triggered on each layout's child.
-				// But we know that count of dragEnter and dragLeave events
-				// will be balanced after leaving the layout's container
-				// so we can increase and decrease count of dragEnter and
-				// when it'll be equal to 0 we'll remove the placeholder
 				if (dragEnterCount.current === 0) {
 					removeDroppingPlaceholder();
 				}
 			},
 			[preventBrowserNativeAction, removeDroppingPlaceholder],
 		);
-		// onDragEnter
+
 		const onInnerDragEnter: DragHandler = useCallback(
 			(e) => {
 				preventBrowserNativeAction(e);
@@ -292,13 +281,10 @@ const GridLayout: FC<RGLProps> = memo(
 			},
 			[preventBrowserNativeAction],
 		);
-		// Called while dragging an element. Part of browser native drag/drop API.
-		// Native event target might be the layout itself, or an element within the layout.
+
 		const onInnerDragOver: DragHandler = useCallback(
 			(e) => {
 				preventBrowserNativeAction(e);
-				// Allow user to customize the dropping item or short-circuit the drop based on the results
-				// of the `onDragOver(e: Event)` callback.
 				if (typeof onDropDragOver === 'function') {
 					const onDragOverResult = onDropDragOver(e);
 					if (onDragOverResult === false) {
@@ -308,8 +294,7 @@ const GridLayout: FC<RGLProps> = memo(
 						return false;
 					}
 					const { w, h, ...dropItem } = { ...droppingItem, ...onDragOverResult };
-					const gridRect = e.currentTarget.getBoundingClientRect(); // The grid's position in the viewport
-					// Calculate the mouse position relative to the grid
+					const gridRect = e.currentTarget.getBoundingClientRect();
 					const layerX = e.clientX - gridRect.left;
 					const layerY = e.clientY - gridRect.top;
 					const position = {
@@ -380,7 +365,6 @@ const GridLayout: FC<RGLProps> = memo(
 				const item = getLayoutItem(innerPropsRef.current.layout, i);
 				if (item) {
 					const { w, h, x, y } = item;
-					// Create placeholder (display only)
 					const placeholder: Rect = {
 						w,
 						h,
@@ -407,9 +391,6 @@ const GridLayout: FC<RGLProps> = memo(
 			(i, x, y, { e, node }) => {
 				const item = getLayoutItem(innerPropsRef.current.layout, i);
 				if (item) {
-					/**
-					 * placeholder rect info
-					 */
 					const nextRect: Rect = {
 						w: item.w,
 						h: item.h,
@@ -419,7 +400,6 @@ const GridLayout: FC<RGLProps> = memo(
 						i,
 						static: true,
 					};
-					// Move the element to the dragged location.
 					const isUserAction = true;
 					const currentLayout = moveElement(
 						innerPropsRef.current.layout,
@@ -454,12 +434,12 @@ const GridLayout: FC<RGLProps> = memo(
 			},
 			[preventCollision, cols, allowOverlap, onDrag],
 		);
+
 		const onInnerDragStop: Required<ItemProps>['onDragStop'] = useCallback(
 			(i, x, y, { e, node }) => {
 				if (lastRect.current) {
 					const item = getLayoutItem(innerPropsRef.current.layout, i);
 					if (item) {
-						// Move the element here
 						const isUserAction = true;
 						const currentLayout = moveElement(
 							innerPropsRef.current.layout,
@@ -493,7 +473,7 @@ const GridLayout: FC<RGLProps> = memo(
 			},
 			[allowOverlap, cols, onDragStop, preventCollision],
 		);
-		// resize relation logic
+
 		const onInnerResizeStart: Required<ItemProps>['onResizeStart'] = useCallback(
 			(i, _w, _h, { e, node }) => {
 				const item = getLayoutItem(innerPropsRef.current.layout, i);
@@ -536,8 +516,6 @@ const GridLayout: FC<RGLProps> = memo(
 							}
 							shouldMoveItem = true;
 						}
-						// Something like quad tree should be used
-						// to find collisions faster
 						if (preventCollision && !allowOverlap) {
 							const collisions = getAllCollisions(innerPropsRef.current.layout, {
 								...item,
@@ -548,9 +526,7 @@ const GridLayout: FC<RGLProps> = memo(
 							}).filter((layoutItem) => layoutItem.i !== item.i);
 							hasCollisions = collisions.length > 0;
 
-							// If we're colliding, we need adjust the placeholder.
 							if (hasCollisions) {
-								// Reset layoutItem dimensions if there were collisions
 								y = item.y;
 								h = item.h;
 								x = item.x;
@@ -566,10 +542,8 @@ const GridLayout: FC<RGLProps> = memo(
 					},
 				);
 				if (item) {
-					// Shouldn't ever happen, but typechecking makes it necessary
 					let finalLayout = nextLayout;
 					if (shouldMoveItem) {
-						// Move the element to the new position.
 						const isUserAction = true;
 						finalLayout = moveElement(
 							nextLayout,
@@ -583,7 +557,6 @@ const GridLayout: FC<RGLProps> = memo(
 							allowOverlap,
 						);
 					}
-					// Create placeholder element (display only)
 					const placeholder: Rect = {
 						w: item.w,
 						h: item.h,
@@ -602,7 +575,6 @@ const GridLayout: FC<RGLProps> = memo(
 						const nextInnerLayout = allowOverlap
 							? finalLayout
 							: compact(finalLayout, innerPropsRef.current.compactType, cols);
-						// Re-compact the newLayout and set the drag placeholder.
 						if (!isEqual(lastRect.current, placeholder)) {
 							setRect(placeholder);
 							lastRect.current = placeholder;
@@ -615,6 +587,7 @@ const GridLayout: FC<RGLProps> = memo(
 			},
 			[allowOverlap, cols, onResize, preventCollision],
 		);
+
 		const onInnerResizeStop: Required<ItemProps>['onResizeStop'] = useCallback(
 			(i, _w, _h, { e, node }) => {
 				const item = getLayoutItem(innerPropsRef.current.layout, i);
@@ -648,13 +621,8 @@ const GridLayout: FC<RGLProps> = memo(
 			(child: ReactNode, isDrop?: boolean) => {
 				if (child && typeof child === 'object' && 'key' in child) {
 					const item = getLayoutItem(innerLayout, String(child.key));
-					if (!item) {
-						return null;
-					}
-					// Determine user manipulations possible.
-					// If an item is static, it can't be manipulated by default.
-					// Any properties defined directly on the grid item will take precedence.
-					const { w, h, x, y, i, minH, minW, maxH, maxW } = item;
+					if (!item) return null;
+
 					const draggable =
 						typeof item.isDraggable === 'boolean'
 							? item.isDraggable
@@ -664,47 +632,54 @@ const GridLayout: FC<RGLProps> = memo(
 							? item.isResizable
 							: !item.static && isResizable;
 					const resizeHandlesOptions = item.resizeHandles || resizeHandles;
-					// isBounded set on child if set on parent, and child is not explicitly false
 					const bounded = draggable && isBounded && item.isBounded !== false;
-					return (
-						<GridItem
-							key={`Grid-Item-${child.key}`}
-							containerWidth={width}
-							cols={cols}
-							margin={margin}
-							containerPadding={containerPadding}
-							maxRows={maxRows}
-							rowHeight={rowHeight}
-							cancel={draggableCancel}
-							handle={draggableHandle}
-							onDragStop={onInnerDragStop}
-							onDragStart={onInnerDragStart}
-							onDrag={onInnerDrag}
-							onResizeStart={onInnerResizeStart}
-							onResize={onInnerResize}
-							onResizeStop={onInnerResizeStop}
-							isDraggable={draggable}
-							isResizable={resizable}
-							isBounded={bounded}
-							useCSSTransforms={useCSSTransforms && mounted}
-							usePercentages={!mounted}
-							transformScale={transformScale}
-							w={w}
-							h={h}
-							x={x}
-							y={y}
-							i={i}
-							minH={minH}
-							minW={minW}
-							maxH={maxH}
-							maxW={maxW}
-							static={item.static}
-							droppingPosition={isDrop ? droppingPosition : undefined}
-							resizeHandles={resizeHandlesOptions}
-							resizeHandle={resizeHandle}
-							wrapperProps={wrapperProps}>
+
+					const gridItemProps = {
+						key: `Grid-Item-${child.key}`,
+						containerWidth: width,
+						cols,
+						margin,
+						containerPadding,
+						maxRows,
+						rowHeight,
+						cancel: draggableCancel,
+						handle: draggableHandle,
+						onDragStop: onInnerDragStop,
+						onDragStart: onInnerDragStart,
+						onDrag: onInnerDrag,
+						onResizeStart: onInnerResizeStart,
+						onResize: onInnerResize,
+						onResizeStop: onInnerResizeStop,
+						isDraggable: draggable,
+						isResizable: resizable,
+						isBounded: bounded,
+						useCSSTransforms: useCSSTransforms && mounted,
+						usePercentages: !mounted,
+						transformScale,
+						w: item.w,
+						h: item.h,
+						x: item.x,
+						y: item.y,
+						i: item.i,
+						minH: item.minH,
+						minW: item.minW,
+						maxH: item.maxH,
+						maxW: item.maxW,
+						static: item.static,
+						droppingPosition: isDrop ? droppingPosition : undefined,
+						resizeHandles: resizeHandlesOptions,
+						resizeHandle,
+						wrapperProps,
+					};
+
+					return item.autoHeight ? (
+						<AutoHeightItem
+							{...gridItemProps}
+							onHeightChange={(height) => handleItemHeightChange(item.i, height)}>
 							{child}
-						</GridItem>
+						</AutoHeightItem>
+					) : (
+						<GridItem {...gridItemProps}>{child}</GridItem>
 					);
 				}
 				return null;
@@ -715,6 +690,7 @@ const GridLayout: FC<RGLProps> = memo(
 				draggableCancel,
 				draggableHandle,
 				droppingPosition,
+				handleItemHeightChange,
 				isBounded,
 				isDraggable,
 				isResizable,
@@ -738,6 +714,24 @@ const GridLayout: FC<RGLProps> = memo(
 			],
 		);
 
+		useEffect(() => {
+			if (!lastRect.current) {
+				setInnerLayout(latestLayout);
+			}
+		}, [latestLayout]);
+
+		useLayoutEffect(() => {
+			if (!mounted) {
+				setMounted(true);
+			}
+		}, [mounted]);
+
+		useEffect(() => {
+			if (mounted) {
+				onLayoutMaybeChanged(innerLayout, lastLayout.current);
+			}
+		}, [innerLayout, mounted, onLayoutMaybeChanged]);
+
 		const mergedStyle = useMemo(() => {
 			if (mergeStyle) {
 				return {
@@ -752,29 +746,6 @@ const GridLayout: FC<RGLProps> = memo(
 			() => `${layoutClassName} ${className || ''}`.trimEnd(),
 			[className],
 		);
-
-		useEffect(() => {
-			//  not in dragging or resizing
-			if (!lastRect.current) {
-				setInnerLayout(latestLayout);
-			}
-		}, [latestLayout]);
-
-		// init layout
-		useLayoutEffect(() => {
-			if (!mounted) {
-				setMounted(true);
-			}
-		}, [mounted]);
-
-		useEffect(() => {
-			// const previousLayout = lastLayout.current;
-			if (mounted) {
-				// Possibly call back with layout on mount. This should be done after correcting the layout width
-				// to ensure we don't rerender with the wrong width.
-				onLayoutMaybeChanged(innerLayout, lastLayout.current);
-			}
-		}, [innerLayout, mounted, onLayoutMaybeChanged]);
 
 		return (
 			<div

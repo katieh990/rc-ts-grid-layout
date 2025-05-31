@@ -23,6 +23,7 @@ const layout = _.map(new Array(items), (_, i) => {
 		w: 2,
 		h: y,
 		i: i.toString(),
+		autoHeight: i === 0, // Make the first item auto-height
 	};
 });
 
@@ -97,6 +98,12 @@ const Case = () => {
 				<div key={item.i}>
 					<span className="text">{item.i}</span>
 					<button onClick={onRemoveItem(item.i)}>remove</button>
+					{item.autoHeight && (
+						<div style={{ padding: '20px' }}>
+							<p>This is an auto-height item with dynamic content.</p>
+							<p>Add more content to see it grow!</p>
+						</div>
+					)}
 				</div>
 			);
 		});
