@@ -1,6 +1,13 @@
-import type { ResizeHandle } from 'react-resizable';
+export type CompactType = 'vertical' | 'horizontal' | undefined;
 
-export type LayoutItem = {
+export interface Position {
+	left: number;
+	top: number;
+	width: number;
+	height: number;
+}
+
+export interface LayoutItem {
 	w: number;
 	h: number;
 	x: number;
@@ -14,18 +21,9 @@ export type LayoutItem = {
 	static?: boolean;
 	isDraggable?: boolean;
 	isResizable?: boolean;
-	resizeHandles?: ResizeHandle[]; // 假设 ResizeHandleAxis 是已定义的类型
 	isBounded?: boolean;
-};
-export type Layout = LayoutItem[];
+	resizeHandles?: Array<'s' | 'w' | 'e' | 'n' | 'sw' | 'nw' | 'se' | 'ne'>;
+	autoHeight?: boolean; // New property for auto-height support
+}
 
-export type Position = {
-	left: number;
-	top: number;
-	width: number;
-	height: number;
-};
-
-export type PartialPosition = { left: number; top: number };
-
-export type CompactType = 'horizontal' | 'vertical' | 'unset' | undefined;
+export type Layout = Array<LayoutItem>;
